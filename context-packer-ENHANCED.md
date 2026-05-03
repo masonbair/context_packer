@@ -1398,3 +1398,289 @@ context-packer pack \
 ---
 
 **This specification provides everything needed to build context-packer.** Focus on core token management and packing first, then add ranking and caching. This is the capstone tool that brings the entire ecosystem together.
+
+---
+
+## Additional Enhancements from Testing & Roadmap
+
+### Priority 1: AI Agent SDK / Library API
+
+**Problem**: Tools are CLI-only, hard to integrate programmatically
+**Required**: Rust library API + Python bindings for AI frameworks
+
+**Rust Library API**:
+```rust
+// New crate: ai-context (library)
+use ai_context::{ContextTools, Query, TokenBudget};
+
+let tools = ContextTools::new("./my-project")?;
+
+// High-level API
+let context = tools.get_context_for_query(
+    "add authentication",
+    TokenBudget::new(8000)
+)?;
+
+// Low-level API
+let symbols = tools.index().query_symbol("login")?;
+let summary = tools.summarizer().get_architecture()?;
+let results = tools.query().search("authentication")?;
+```
+
+**Python Bindings (via PyO3)**:
+```python
+from ai_context import ContextTools
+
+tools = ContextTools("./my-project")
+context = tools.get_context_for_query(
+    query="add authentication",
+    budget=8000,
+    model="claude"
+)
+
+print(context.architecture_summary)
+print(context.relevant_files)
+print(context.dependencies)
+```
+
+**Implementation**:
+```rust
+// Library crate structure
+pub struct ContextTools {
+    project_root: PathBuf,
+    index: CodeIndex,
+    summarizer: Summarizer,
+    query: QueryEngine,
+    packer: ContextPacker,
+}
+
+impl ContextTools {
+    pub fn new(project_root: impl AsRef<Path>) -> Result<Self>;
+
+    pub fn get_context_for_query(
+        &self,
+        query: &str,
+        budget: TokenBudget,
+    ) -> Result<PackedContext>;
+
+    pub fn index(&self) -> &CodeIndex;
+    pub fn summarizer(&self) -> &Summarizer;
+    pub fn query(&self) -> &QueryEngine;
+    pub fn packer(&self) -> &ContextPacker;
+}
+
+// Python bindings
+#[pyclass]
+struct PyContextTools {
+    inner: ContextTools,
+}
+
+#[pymethods]
+impl PyContextTools {
+    #[new]
+    fn new(project_root: String) -> PyResult<Self> { ... }
+
+    fn get_context_for_query(
+        &self,
+        query: String,
+        budget: usize,
+        model: Option<String>,
+    ) -> PyResult<PyPackedContext> { ... }
+}
+```
+
+**Impact**: Easy integration with AI frameworks (LangChain, Autogen, etc.)
+
+---
+
+### Priority 2: Unified Integration Layer
+
+**New Unified Commands**:
+```bash
+# Single command for comprehensive context
+ai-context analyze --query "where is regex parsing" --mode comprehensive
+
+# Behind the scenes:
+# 1. Check if summaries exist and are fresh
+# 2. Query code-index for symbols
+# 3. Use context-query for text search
+# 4. Use context-packer to assemble optimal context
+# 5. Return unified result
+```
+
+**Orchestration**:
+```rust
+pub struct ContextOrchestrator {
+    index: CodeIndexClient,
+    summarizer: SummarizerClient,
+    query: QueryClient,
+    packer: PackerClient,
+}
+
+impl ContextOrchestrator {
+    pub fn analyze(&self, query: &str, budget: usize) -> Result<Context> {
+        // Smart orchestration of all tools
+        // 1. Check cache
+        // 2. Find relevant files via index + query
+        // 3. Pack context within budget
+        // 4. Return optimized result
+    }
+}
+```
+
+---
+
+### Priority 3: Enhanced Relevance Ranking
+
+**Additional Scoring Factors**:
+```rust
+// Updated scoring formula with learned weights
+score = (query_match * 3.0) +
+        (dep_proximity * 2.0) +
+        (hotness * 1.5) +
+        (recency * 1.0) +
+        (centrality * 0.5) +
+        (test_coverage * 0.3) +      // NEW: prioritize well-tested code
+        (documentation * 0.2)         // NEW: prefer documented code
+```
+
+**Semantic Search Integration** (when available):
+```rust
+// If semantic search available via code-index
+pub fn calculate_semantic_match(&self, file: &Path, query: &str) -> Result<f64> {
+    // Use vector embeddings for concept-based matching
+    let file_embedding = self.get_file_embedding(file)?;
+    let query_embedding = self.get_query_embedding(query)?;
+    Ok(cosine_similarity(file_embedding, query_embedding))
+}
+```
+
+---
+
+### Quick Wins
+
+**Better Output Formatting**:
+```markdown
+# Context: Optimize search performance
+
+**Budget**: 8000 tokens / 7842 used (98%)
+**Model**: Claude Sonnet 4.5
+**Generated**: 2026-05-02 14:32 UTC
+
+---
+
+## 📊 Summary Statistics
+
+- Files included: 7
+- Files omitted: 12 (low relevance or budget)
+- Token efficiency: 98%
+- Average file priority: 0.78
+
+---
+
+## 🏗️ Architecture Overview
+
+{architecture_summary}
+
+---
+
+## 📁 Relevant Code (Ranked by Priority)
+
+### 1. src/search/engine.rs ⭐ Priority: HIGH (score: 0.95)
+**Tokens**: 450 | **Hotness**: 8.2 | **Last Modified**: 2 hours ago
+
+```rust
+{content}
+```
+
+**Dependencies** (included):
+- ✓ src/index/client.rs
+- ✓ src/types/query.rs
+
+**Callers** (2):
+- src/api/routes.rs:45
+- src/main.rs:120
+
+---
+```
+
+**Progress Indicators**:
+```bash
+context-packer pack --query "test"
+
+# ⠋ Analyzing codebase...
+# ✓ Loaded architecture summary (235 tokens)
+# ⠋ Searching for relevant files... (found 45)
+# ⠋ Scoring files... [████████░░] 82%
+# ✓ Selected 7 files (7842 tokens)
+# ✓ Context packed successfully
+```
+
+---
+
+### Future Enhancements
+
+**TUI Explorer Integration**:
+```bash
+# Launch interactive mode with visual file browser
+context-packer explore
+
+# TUI features:
+# - File tree with relevance scores
+# - Real-time token budget visualization
+# - Dependency graph (ASCII art)
+# - Preview pane for selected files
+# - Vim-style keybindings
+```
+
+**Team Collaboration**:
+```bash
+# Share packed contexts with team
+context-packer push --remote s3://team-bucket/contexts
+
+# Pull pre-packed contexts
+context-packer pull --remote s3://team-bucket/contexts
+
+# Benefits: One developer packs, whole team benefits
+```
+
+**LSP Integration** (long-term):
+```bash
+# Start as language server
+context-packer lsp
+
+# Provides to IDE:
+# - "Pack context for AI" code action
+# - Hover shows relevance scores
+# - Inline token budget indicators
+```
+
+---
+
+### Configuration Enhancements
+
+**Extended config.toml**:
+```toml
+[context-packer.advanced]
+# Machine learning-based ranking (experimental)
+use_ml_ranking = false
+ml_model_path = "~/.cache/ai-tools/ranking-model.onnx"
+
+# Feedback loop for improving relevance
+collect_feedback = true
+feedback_file = "~/.cache/ai-tools/packer-feedback.jsonl"
+
+# Team collaboration
+remote_cache_enabled = false
+remote_cache_url = "s3://team-bucket/context-cache"
+
+[context-packer.optimization]
+# Aggressive caching
+cache_embeddings = true
+cache_token_counts = true
+cache_relevance_scores = true
+
+# Parallel processing
+parallel_scoring = true
+num_workers = 4
+```
